@@ -1,7 +1,6 @@
 "use client"
-
-import { useState } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "../components/ui/dialog"
+import { useState } from "react";
+import { DialogHeader, Dialog, DialogContent, DialogTitle, DialogFooter } from "../components/ui/dialog";
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
 import { Checkbox } from "../components/ui/checkbox"
@@ -11,34 +10,24 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import type { Persona } from "../types/persona"
 import { Textarea } from "../components/ui/textarea"
+import axios from "axios"
 
-interface AddPersonaModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onAdd: (persona: Persona) => void
+interface FormValues {
+  // Define the fields expected in the form
+  name: string;
+  age: number;
+  // Add other fields as needed
 }
 
-// Update the Zod schema to include the new fields for each persona type
 const formSchema = z.object({
-  name: z.string().min(2, {
-    message: "Name must be at least 2 characters.",
-  }),
-  email: z
-    .string()
-    .email({
-      message: "Please enter a valid email address.",
-    })
-    .optional()
-    .or(z.literal("")),
+  name: z.string().min(2, { message: "Name must be at least 2 characters." }),
+  email: z.string().email({ message: "Please enter a valid email address." }).optional().or(z.literal("")),
   phone: z.string().optional().or(z.literal("")),
   state: z.string().optional().or(z.literal("")),
   pinCode: z.string().optional().or(z.literal("")),
   message: z.string().optional().or(z.literal("")),
-  type: z.string({
-    required_error: "Please select a persona type.",
-  }),
+  type: z.string({ required_error: "Please select a persona type." }),
   // Vendor specific fields
   address: z.string().optional().or(z.literal("")),
   panNumber: z.string().optional().or(z.literal("")),
@@ -77,7 +66,12 @@ const formSchema = z.object({
   isFavorite: z.boolean().default(false),
 })
 
-export default function AddPersonaModal({ isOpen, onClose, onAdd }: AddPersonaModalProps) {
+interface AddPersonaModalProps {
+  isOpen: boolean
+  onClose: () => void
+}
+
+const AddPersonaModal = ({ isOpen, onClose }: AddPersonaModalProps) => {
   const [activeTab, setActiveTab] = useState("basic")
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -129,49 +123,19 @@ export default function AddPersonaModal({ isOpen, onClose, onAdd }: AddPersonaMo
     },
   })
 
-  // Update the onSubmit function to handle the new fields
-  function onSubmit(values: z.infer<typeof formSchema>) {
-    const newPersona: Persona = {
-      id: Date.now().toString(),
-      name: values.name,
-      email: values.email || undefined,
-      phone: values.phone || undefined,
-      location: values.location || values.state || "",
-      type: values.type,
-      // Conditionally add specific fields based on type
-      ...(values.type === "Employees" && {
-        dateOfBirth: values.dateOfBirth,
-        fatherName: values.fatherName,
-        bloodGroup: values.bloodGroup,
-        emergencyContact: values.emergencyContact,
-        aadharNumber: values.aadharNumber,
-        joiningDate: values.joiningDate,
-        previousEmployer: values.previousEmployer,
-      }),
-      ...(values.type === "Vendors" && {
-        address: values.address,
-        panNumber: values.panNumber,
-        gstNumber: values.gstNumber,
-        bankName: values.bankName,
-        accountNumber: values.accountNumber,
-      }),
-      ...(values.type === "Customers" && {
-        age: values.age,
-        job: values.job,
-        income: values.income,
-        familyMembers: values.familyMembers,
-        wheelchairType: values.wheelchairType,
-        commuteMode: values.commuteMode,
-      }),
-      added: new Date().toISOString().split("T")[0],
-      isFavorite: values.isFavorite,
-      status: "Active",
+  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    try {
+      const response = await axios.post('http://localhost:5000/api/add', data);
+      console.log('Persona added successfully:', response.data);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        console.error('Error adding persona:', error.message);
+        // You can also display a user-friendly error message here
+      } else {
+        console.error('Unexpected error:', error);
+      }
     }
-
-    onAdd(newPersona)
-    form.reset()
-    onClose()
-  }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -673,23 +637,58 @@ export default function AddPersonaModal({ isOpen, onClose, onAdd }: AddPersonaMo
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
                         control={form.control}
+                        name="interests"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Interests</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Gardening, Reading" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name="userType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>User Type</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select user type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="driver">Driver</SelectItem>
+                                <SelectItem value="passenger">Passenger</SelectItem>
+                                <SelectItem value="both">Both</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
                         name="wheelchairType"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Wheelchair Type</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                              <FormControl>
+                            <FormControl>
+                              <Select onValueChange={field.onChange} value={field.value}>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select wheelchair type" />
                                 </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="manual">Manual</SelectItem>
-                                <SelectItem value="power">Power</SelectItem>
-                                <SelectItem value="specialized">Specialized</SelectItem>
-                                <SelectItem value="none">None</SelectItem>
-                              </SelectContent>
-                            </Select>
+                                <SelectContent>
+                                  <SelectItem value="manual">Manual</SelectItem>
+                                  <SelectItem value="electric">Electric</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -700,7 +699,7 @@ export default function AddPersonaModal({ isOpen, onClose, onAdd }: AddPersonaMo
                         name="commuteRange"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Daily Commute Range (km)</FormLabel>
+                            <FormLabel>Commute Range (km)</FormLabel>
                             <FormControl>
                               <Input type="number" min="0" placeholder="10" {...field} />
                             </FormControl>
@@ -808,3 +807,4 @@ export default function AddPersonaModal({ isOpen, onClose, onAdd }: AddPersonaMo
   )
 }
 
+export default AddPersonaModal;

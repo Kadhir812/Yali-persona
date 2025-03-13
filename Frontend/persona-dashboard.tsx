@@ -49,7 +49,7 @@ import NotificationSettings from "./components/notification-settings"
 import SettingsDialog from "./components/settings-dialog"
 import QuickActions from "./components/quick-actions"
 import type { Persona } from "./types/persona"
-import { initialPersonas } from "./data/initial-personas"
+// import { initialPersonas } from "./data/initial-personas"
 
 // Add imports for the dialogs we'll create
 import ScheduleMeetingDialog from "./components/schedule-meeting-dialog"
@@ -62,6 +62,7 @@ import GenerateReportDialog from "./components/generate-report-dialog"
 import AnalyticsDialog from "./components/analytics-dialog"
 import BackupDataDialog from "./components/backup-data-dialog"
 import RestoreDataDialog from "./components/restore-data-dialog"
+import axios from 'axios';
 
 type ViewMode = "card" | "list" | "grid" | "compact"
 type SortOption = "name" | "type" | "added" | "recent"
@@ -75,7 +76,7 @@ type FilterCriteria = {
 export default function PersonaDashboard() {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
-  const [personas, setPersonas] = useState<Persona[]>(initialPersonas)
+  const [personas, setPersonas] = useState<Persona[]>([]);
   const [favorites, setFavorites] = useState<Persona[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -106,18 +107,47 @@ export default function PersonaDashboard() {
   const [isBackupDataOpen, setIsBackupDataOpen] = useState(false)
   const [isRestoreDataOpen, setIsRestoreDataOpen] = useState(false)
 
-  // Calculate stats
-  const employeeCount = personas.filter((p) => p.type === "Employees").length
-  const vendorCount = personas.filter((p) => p.type === "Vendors").length
-  const customerCount = personas.filter((p) => p.type === "Customers").length
-  const investorCount = personas.filter((p) => p.type === "Investors").length
-  const favoritedPercentage = personas.length > 0 ? Math.round((favorites.length / personas.length) * 100) : 0
+  //Employee dashboradbackend
+  const [employeeCount, setEmployeeCount] = useState(0);
+  const [vendorCount, setVendorCount] = useState(0);
+  const [customerCount, setCustomerCount] = useState(0);
+  const [investorCount, setInvestorCount] = useState(0);
 
   // Initialize favorites from personas with isFavorite=true
+
+
+  useEffect(() => {
+    fetchCounts();
+    fetchPersonas();
+  }, []);
+
   useEffect(() => {
     const initialFavorites = personas.filter((persona) => persona.isFavorite)
     setFavorites(initialFavorites)
-  }, [personas])
+  }, [personas]);
+
+  const fetchCounts = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/persona-counts');
+      const { employees, vendors, customers, investors } = response.data;
+      setEmployeeCount(employees);
+      setVendorCount(vendors);
+      setCustomerCount(customers);
+      setInvestorCount(investors);
+    } catch (error) {
+      console.error('Error fetching persona counts:', error);
+    }
+  };
+
+  const fetchPersonas = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/personas');
+      setPersonas(response.data);
+      setFavorites(response.data.filter((persona: Persona) => persona.isFavorite));
+    } catch (error) {
+      console.error('Error fetching personas:', error);
+    }
+  };
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     // Stop event propagation to prevent navigation when clicking the favorite button
@@ -136,15 +166,22 @@ export default function PersonaDashboard() {
         setFavorites((prev) => [...prev, { ...persona, isFavorite: true }])
       }
     }
-  }
-
-  const handleAddPersona = (newPersona: Persona) => {
-    setPersonas((prev) => [...prev, newPersona])
-    if (newPersona.isFavorite) {
-      setFavorites((prev) => [...prev, newPersona])
+  };
+  
+  const handleAddPersona = async (newPersona: Persona) => {
+    try {
+      // Make a POST request to add the new persona to the database
+      await axios.post('http://localhost:5000/api/add', newPersona);
+      
+      // Refetch the personas to include the newly added persona
+      fetchPersonas();
+      
+      // Close the modal
+      setIsAddModalOpen(false);
+    } catch (error) {
+      console.error('Error adding persona:', error);
     }
-    setIsAddModalOpen(false)
-  }
+  };
 
   const applyAdvancedFilter = (criteria: FilterCriteria) => {
     setFilterCriteria(criteria)
@@ -258,6 +295,9 @@ export default function PersonaDashboard() {
 
   // Get all unique locations for filter
   const allLocations = Array.from(new Set(personas.map((p) => p.location)))
+
+  // Calculate favorited percentage
+  const favoritedPercentage = personas.length > 0 ? (favorites.length / personas.length) * 100 : 0;
 
   // Active filter count
   const activeFilterCount =
