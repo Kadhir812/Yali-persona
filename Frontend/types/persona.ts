@@ -1,60 +1,40 @@
-export type Persona = {
-  id: string
-  name: string
-  type: string
-  email?: string
-  phone?: string
-  location: string
-  state?: string
-  pinCode?: string
-  message?: string
-  added: string
-  lastInteraction?: string
-  isFavorite: boolean
-  status?: string
-
-  // Employee specific fields
-  role?: string
-  department?: string
-  dateOfBirth?: string
-  fatherName?: string
-  bloodGroup?: string
-  emergencyContact?: string
-  aadharNumber?: string
-  joiningDate?: string
-  probationEndDate?: string
-  previousEmployer?: string
-
-  // Vendor specific fields
-  category?: string
-  address?: string
-  panNumber?: string
-  gstNumber?: string
-  bankName?: string
-  accountNumber?: string
-  ifscCode?: string
-
-  // Customer specific fields
-  revenue?: string
-  age?: string
-  job?: string
-  income?: string
-  familyMembers?: string
-  weight?: string
-  interests?: string
-  userType?: string
-  wheelchairType?: string
-  commuteRange?: string
-  commuteMode?: string
-  speed?: string
-  commonPlace?: string
-  painsDaily?: string
-  painsCommute?: string
-  solutionsNeeded?: string
-  customerSegment?: string
-  expectedGain?: string
-
-  // Investor specific fields
-  investment?: string
+interface Persona {
+  name: string;
+  email?: string;
+  phone?: string;
+  state?: string;
+  pin_code?: string;
+  message?: string;
+  type: string;
+  address?: string;
+  pan_number?: string;
+  gst_number?: string;
+  bank_name?: string;
+  account_number?: string;
+  ifsc_code?: string;
+  date_of_birth?: string;
+  father_name?: string;
+  blood_group?: string;
+  emergency_contact?: string;
+  aadhar_number?: string;
+  joining_date?: string;
+  probation_end_date?: string;
+  previous_employer?: string;
+  age?: string;
+  location?: string;
+  job?: string;
+  income_range?: string;
+  family_members?: string;
+  weight?: string;
+  interests?: string;
+  user_type?: string;
+  wheelchair_type?: string;
+  commute_range?: string;
+  commute_mode?: string;
+  pains_daily?: string;
+  pains_commute?: string;
+  solutions_needed?: string;
+  customer_segment?: string;
+  expected_gain?: string;
+  isFavorite: boolean;
 }
-

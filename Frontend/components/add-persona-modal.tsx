@@ -69,9 +69,10 @@ const formSchema = z.object({
 interface AddPersonaModalProps {
   isOpen: boolean
   onClose: () => void
+  onAdd: (newPersona: FormValues) => Promise<void>;
 }
 
-const AddPersonaModal = ({ isOpen, onClose }: AddPersonaModalProps) => {
+const AddPersonaModal = ({ isOpen, onClose, onAdd }: AddPersonaModalProps) => {
   const [activeTab, setActiveTab] = useState("basic")
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -112,21 +113,19 @@ const AddPersonaModal = ({ isOpen, onClose }: AddPersonaModalProps) => {
       wheelchairType: "",
       commuteRange: "",
       commuteMode: "",
-      speed: "",
-      commonPlace: "",
       painsDaily: "",
       painsCommute: "",
       solutionsNeeded: "",
-      customerSegment: "",
-      expectedGain: "",
       isFavorite: false,
     },
   })
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
-      const response = await axios.post('http://localhost:5000/api/add', data);
+      const response = await axios.post('http://localhost:5000/api/personas', data);
       console.log('Persona added successfully:', response.data);
+      // Optionally, you can close the modal here
+      onClose();
     } catch (error) {
       if (axios.isAxiosError(error)) {
         console.error('Error adding persona:', error.message);
@@ -662,9 +661,9 @@ const AddPersonaModal = ({ isOpen, onClose }: AddPersonaModalProps) => {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="driver">Driver</SelectItem>
-                                <SelectItem value="passenger">Passenger</SelectItem>
-                                <SelectItem value="both">Both</SelectItem>
+                                <SelectItem value="Driver">Driver</SelectItem>
+                                <SelectItem value="Passenger">Passenger</SelectItem>
+                                <SelectItem value="Both">Both</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -684,8 +683,8 @@ const AddPersonaModal = ({ isOpen, onClose }: AddPersonaModalProps) => {
                                   <SelectValue placeholder="Select wheelchair type" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="manual">Manual</SelectItem>
-                                  <SelectItem value="electric">Electric</SelectItem>
+                                  <SelectItem value="Manual">Manual</SelectItem>
+                                  <SelectItem value="Electric">Electric</SelectItem>
                                 </SelectContent>
                               </Select>
                             </FormControl>
@@ -721,11 +720,11 @@ const AddPersonaModal = ({ isOpen, onClose }: AddPersonaModalProps) => {
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                <SelectItem value="public">Public Transport</SelectItem>
-                                <SelectItem value="private">Private Vehicle</SelectItem>
-                                <SelectItem value="taxi">Taxi/Ride-sharing</SelectItem>
-                                <SelectItem value="walking">Walking</SelectItem>
-                                <SelectItem value="wheelchair">Wheelchair</SelectItem>
+                                <SelectItem value="Public Transport">Public Transport</SelectItem>
+                                <SelectItem value="Private Vehicle">Private Vehicle</SelectItem>
+                                <SelectItem value="Taxi/Ride-sharing">Taxi/Ride-sharing</SelectItem>
+                                <SelectItem value="Walking">Walking</SelectItem>
+                                <SelectItem value="Wheelchair">Wheelchair</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormMessage />

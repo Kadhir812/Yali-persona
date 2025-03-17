@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-require('dotenv').config({ path: './src/.env' });
+require('dotenv').config();
 
 const app = express();
 const port = 5000;
@@ -11,14 +11,8 @@ app.use(bodyParser.json());
 app.use(cors());
 
 // Routes
-const addPersonaRoute = require('./routes/addPersona');
-app.use('/api/add', addPersonaRoute);
-
-const personaCountsRoute = require('./routes/personaCounts');
-app.use('/api/persona-counts', personaCountsRoute);
-
-const allPersonasRoute = require('./routes/allPersonas');
-app.use('/api', allPersonasRoute); // Ensure the base path matches the route definition
+const personaRoutes = require('./routes/personaRoutes'); // Combined routes
+app.use('/api', personaRoutes);
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
