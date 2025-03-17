@@ -63,6 +63,7 @@ import AnalyticsDialog from "./components/analytics-dialog"
 import BackupDataDialog from "./components/backup-data-dialog"
 import RestoreDataDialog from "./components/restore-data-dialog"
 import axios from 'axios';
+import ImportDataModal from "./components/import-data-dialog"
 
 type ViewMode = "card" | "list" | "grid" | "compact"
 type SortOption = "name" | "type" | "added" | "recent"
@@ -77,23 +78,26 @@ export default function PersonaDashboard() {
   const router = useRouter()
   const { theme, setTheme } = useTheme()
   const [personas, setPersonas] = useState<Persona[]>([]);
-  const [favorites, setFavorites] = useState<Persona[]>([])
+  const [favorites, setFavorites] = useState<Persona[]>([]);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("")
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isOcrModalOpen, setIsOcrModalOpen] = useState(false)
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<ViewMode>("list")
-  const [favViewMode, setFavViewMode] = useState<ViewMode>("grid")
+  const [viewMode, setViewMode] = useState<"compact" | "list">("compact");
+  const [favViewMode, setFavViewMode] = useState<"grid" | "card" | "list">("grid");
   const [sortBy, setSortBy] = useState<SortOption>("name")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false)
+  // const [ISImportDataOpen, setIsImportDataOpen] = useState(false)
   const [filterCriteria, setFilterCriteria] = useState<FilterCriteria>({
     type: [],
     status: [],
     location: [],
     dateAdded: "all",
   })
+  const API_BASE_URL = "http://localhost:5000/api"; 
 
   // Add state variables for all the dialogs
   const [isScheduleMeetingOpen, setIsScheduleMeetingOpen] = useState(false)
@@ -107,79 +111,95 @@ export default function PersonaDashboard() {
   const [isBackupDataOpen, setIsBackupDataOpen] = useState(false)
   const [isRestoreDataOpen, setIsRestoreDataOpen] = useState(false)
 
-  //Employee dashboradbackend
-  const [employeeCount, setEmployeeCount] = useState(0);
-  const [vendorCount, setVendorCount] = useState(0);
-  const [customerCount, setCustomerCount] = useState(0);
-  const [investorCount, setInvestorCount] = useState(0);
-
-  // Initialize favorites from personas with isFavorite=true
+    // Calculate counts dynamically
+    const employeeCount = personas.filter((p) => p.type === "Employees").length;
+    const vendorCount = personas.filter((p) => p.type === "Vendors").length;
+    const customerCount = personas.filter((p) => p.type === "Customers").length;
+    const investorCount = personas.filter((p) => p.type === "Investors").length;
 
 
-  useEffect(() => {
-    fetchCounts();
-    fetchPersonas();
-  }, []);
 
-  useEffect(() => {
-    const initialFavorites = personas.filter((persona) => persona.isFavorite)
-    setFavorites(initialFavorites)
-  }, [personas]);
+    useEffect(() => {
+      const fetchPersonas = async () => {
+        try {
+          const response = await axios.get(`${API_BASE_URL}/personas`);
+          const formattedData = response.data.map((persona: any) => ({
+            ...persona,
+            persona_id: persona.persona_id || persona.id,
+            isFavorite: persona.is_favorite, // Ensuring correct mapping
+          }));
+          setPersonas(formattedData);
+          setFavorites(formattedData.filter((p) => p.isFavorite));
+        } catch (error) {
+          console.error("Failed to fetch personas:", error);
+          setError("Failed to fetch personas. Please try again.");
+        }
+      };
 
-  const fetchCounts = async () => {
+
+      fetchPersonas();
+    }, []);
+
+    useEffect(() => {
+      setFavorites(personas.filter((persona) => persona.isFavorite));
+    }, [personas]);
+     
+
+  const toggleFavorite = async (persona_id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     try {
-      const response = await axios.get('http://localhost:5000/api/persona-counts');
-      const { employees, vendors, customers, investors } = response.data;
-      setEmployeeCount(employees);
-      setVendorCount(vendors);
-      setCustomerCount(customers);
-      setInvestorCount(investors);
+      const updatedPersonas = personas.map((persona) =>
+        persona.persona_id === persona_id
+          ? { ...persona, isFavorite: !persona.isFavorite }
+          : persona
+      );
+
+      setPersonas(updatedPersonas);
+      setFavorites(updatedPersonas.filter((p) => p.isFavorite));
+
+      await axios.patch(`${API_BASE_URL}/personas/${persona_id}/favorite`, {
+        is_favorite: updatedPersonas.find((p) => p.persona_id === persona_id)?.isFavorite ?? false,
+      });
+
+      console.log(`✅ Favorite updated for Persona ID: ${persona_id}`);
+
     } catch (error) {
-      console.error('Error fetching persona counts:', error);
+      console.error("❌ Failed to update favorite status:", error);
+      setError("Failed to update favorite status. Please try again.");
     }
   };
 
-  const fetchPersonas = async () => {
-    try {
-      const response = await axios.get('http://localhost:5000/api/personas');
-      setPersonas(response.data);
-      setFavorites(response.data.filter((persona: Persona) => persona.isFavorite));
-    } catch (error) {
-      console.error('Error fetching personas:', error);
-    }
-  };
 
-  const toggleFavorite = (id: string, e: React.MouseEvent) => {
-    // Stop event propagation to prevent navigation when clicking the favorite button
-    e.stopPropagation()
 
-    setPersonas((prevPersonas) =>
-      prevPersonas.map((persona) => (persona.id === id ? { ...persona, isFavorite: !persona.isFavorite } : persona)),
-    )
-
-    // Update favorites list
-    const persona = personas.find((p) => p.id === id)
-    if (persona) {
-      if (persona.isFavorite) {
-        setFavorites((prev) => prev.filter((p) => p.id !== id))
-      } else {
-        setFavorites((prev) => [...prev, { ...persona, isFavorite: true }])
-      }
-    }
-  };
   
+    // Add persona and refresh list
   const handleAddPersona = async (newPersona: Persona) => {
     try {
-      // Make a POST request to add the new persona to the database
-      await axios.post('http://localhost:5000/api/add', newPersona);
-      
-      // Refetch the personas to include the newly added persona
-      fetchPersonas();
-      
-      // Close the modal
+      const response = await axios.post(`${API_BASE_URL}/personas`, newPersona);
+
+      if (!response.data || !response.data.data) {
+        console.error("❌ Unexpected API response:", response);
+        setError("Failed to add persona. Please try again.");
+        return;
+      }
+
+      const savedPersona = {
+        ...response.data.data,
+        persona_id: response.data.data.persona_id || response.data.data.id, // Ensure ID consistency
+        isFavorite: response.data.data.is_favorite ?? false,
+      };
+
+      console.log(`✅ Persona added successfully:`, savedPersona);
+
+      setPersonas((prev) => [...prev, savedPersona]); // Add to UI immediately
+      if (savedPersona.isFavorite) {
+        setFavorites((prev) => [...prev, savedPersona]);
+      }
+
       setIsAddModalOpen(false);
     } catch (error) {
-      console.error('Error adding persona:', error);
+      console.error("❌ Failed to add persona:", error);
+      setError("Error adding persona. Please check your inputs and try again.");
     }
   };
 
@@ -381,7 +401,7 @@ export default function PersonaDashboard() {
                             setFilterCriteria({
                               ...filterCriteria,
                               type: filterCriteria.type.filter((t) => t !== type),
-                            })
+                            });
                           }
                         }}
                       />
@@ -538,45 +558,50 @@ export default function PersonaDashboard() {
         </DropdownMenu>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <Card className="bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground">
-          <CardContent className="flex justify-between items-center p-6">
-            <div>
-              <p className="text-3xl font-bold">{employeeCount}</p>
-              <p>Active Employees</p>
-            </div>
-            <Users className="h-10 w-10" />
-          </CardContent>
-        </Card>
-        <Card className="bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground">
-          <CardContent className="flex justify-between items-center p-6">
-            <div>
-              <p className="text-3xl font-bold">{vendorCount}</p>
-              <p>Vendors</p>
-            </div>
-            <Building2 className="h-10 w-10" />
-          </CardContent>
-        </Card>
-        <Card className="bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground">
-          <CardContent className="flex justify-between items-center p-6">
-            <div>
-              <p className="text-3xl font-bold">{customerCount}</p>
-              <p>Customers</p>
-            </div>
-            <UserRound className="h-10 w-10" />
-          </CardContent>
-        </Card>
-        <Card className="bg-primary text-primary-foreground dark:bg-primary dark:text-primary-foreground">
-          <CardContent className="flex justify-between items-center p-6">
-            <div>
-              <p className="text-3xl font-bold">{investorCount}</p>
-              <p>Investors</p>
-            </div>
-            <Briefcase className="h-10 w-10" />
-          </CardContent>
-        </Card>
-      </div>
+      <div className="container mx-auto p-4 max-w-7xl">
+        <h1 className="text-2xl font-bold mb-4">Persona Dashboard</h1>
+
+        {/* Stats Section */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="bg-primary text-primary-foreground">
+            <CardContent className="flex justify-between items-center p-6">
+              <div>
+                <p className="text-3xl font-bold">{employeeCount}</p>
+                <p>Employees</p>
+              </div>
+              <Users className="h-10 w-10" />
+              </CardContent>
+            </Card>
+          <Card className="bg-primary text-primary-foreground">
+            <CardContent className="flex justify-between items-center p-6">
+              <div>
+                <p className="text-3xl font-bold">{vendorCount}</p>
+                <p>Vendors</p>
+              </div>
+              <Building2 className="h-10 w-10" />
+            </CardContent>
+          </Card>
+          <Card className="bg-primary text-primary-foreground">
+            <CardContent className="flex justify-between items-center p-6">
+              <div>
+                <p className="text-3xl font-bold">{customerCount}</p>
+                <p>Customers</p>
+              </div>
+              <UserRound className="h-10 w-10" />
+            </CardContent>
+          </Card>
+          <Card className="bg-primary text-primary-foreground">
+            <CardContent className="flex justify-between items-center p-6">
+              <div>
+                <p className="text-3xl font-bold">{investorCount}</p>
+                <p>Investors</p>
+              </div>
+              <Briefcase className="h-10 w-10" />
+            </CardContent>
+          </Card>
+        </div>
+
+        {error && <p className="text-red-500">{error}</p>}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">
@@ -632,14 +657,14 @@ export default function PersonaDashboard() {
                       <div
                         key={persona.id}
                         className="flex flex-col items-center text-center p-2 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => navigateToProfile(persona.id)}
+                        onClick={() => navigateToProfile(persona.persona_id)}
                       >
                         <div className="w-16 h-16 bg-gray-200 rounded-full mb-2 relative">
                           {/* Placeholder for avatar */}
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={(e) => toggleFavorite(persona.id, e)}
+                            onClick={(e) => toggleFavorite(persona.persona_id, e)}
                             className="absolute -top-2 -right-2 h-6 w-6 text-amber-400 bg-white rounded-full shadow-sm"
                           >
                             <Star className="h-4 w-4 fill-current" />
@@ -657,9 +682,9 @@ export default function PersonaDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {favorites.map((persona) => (
                       <div
-                        key={persona.id}
+                        key={persona.persona_id}
                         className="border rounded-lg p-4 flex justify-between cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => navigateToProfile(persona.id)}
+                        onClick={() => navigateToProfile(persona.persona_id)}
                       >
                         <div>
                           <h3 className="font-semibold text-lg">{persona.name}</h3>
@@ -667,12 +692,12 @@ export default function PersonaDashboard() {
                           {persona.role && <p>Role: {persona.role}</p>}
                           {persona.department && <p>Dept: {persona.department}</p>}
                           {persona.category && <p>Category: {persona.category}</p>}
-                          {persona.investment && <p>Investment: {persona.investment}</p>}
+                          {persona.investment && <p>Investment: {persona.investment}</p>} 
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={(e) => toggleFavorite(persona.id, e)}
+                          onClick={(e) => toggleFavorite(persona.persona_id, e)}
                           className="h-8 w-8 text-amber-400"
                         >
                           <Star className="h-5 w-5 fill-current" />
@@ -682,32 +707,32 @@ export default function PersonaDashboard() {
                   </div>
                 )}
 
-                {favViewMode === "list" && (
-                  <div className="space-y-2">
-                    {favorites.map((persona) => (
-                      <div
-                        key={persona.id}
-                        className="flex items-center border-b pb-2 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => navigateToProfile(persona.id)}
-                      >
-                        <div className="w-10 h-10 bg-gray-200 rounded-full mr-3"></div>
-                        <div className="flex-1">
-                          <div className="flex justify-between items-center">
-                            <h3 className="font-semibold">{persona.name}</h3>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => toggleFavorite(persona.id, e)}
-                              className="h-6 w-6 text-amber-400"
-                            >
-                              <Star className="h-4 w-4 fill-current" />
-                            </Button>
-                          </div>
-                          <div className="flex items-center text-sm text-gray-500">
-                            <Badge variant="outline" className="mr-2">
-                              {persona.type}
-                            </Badge>
-                            <span>{persona.email}</span>
+                  {favViewMode === "list" && (
+                    <div className="space-y-2">
+                      {favorites.map((persona) => (
+                        <div
+                          key={persona.persona_id}  // ✅ Correct key placement
+                          className="flex items-center border-b pb-2 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          onClick={() => navigateToProfile(persona.persona_id)} // ✅ Fixed syntax
+                        >
+                          <div className="w-10 h-10 bg-gray-200 rounded-full mr-3"></div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center">
+                              <h3 className="font-semibold">{persona.name}</h3>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => toggleFavorite(persona.persona_id, e)}
+                                className="h-6 w-6 text-amber-400"
+                              >
+                                <Star className="h-4 w-4 fill-current" />
+                              </Button>
+                            </div>
+                            <div className="flex items-center text-sm text-gray-500">
+                              <Badge variant="outline" className="mr-2">
+                                {persona.type}
+                              </Badge>
+                              <span>{persona.email}</span>
                           </div>
                         </div>
                       </div>
@@ -754,9 +779,9 @@ export default function PersonaDashboard() {
                 <div className="space-y-2">
                   {sortedPersonas.map((persona) => (
                     <div
-                      key={persona.id}
+                      key={persona.persona_id}
                       className="flex items-center p-2 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md cursor-pointer transition-colors"
-                      onClick={() => navigateToProfile(persona.id)}
+                      onClick={() => navigateToProfile(persona.persona_id)}
                     >
                       <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full mr-3"></div>
                       <div className="flex-1 min-w-0">
@@ -778,7 +803,7 @@ export default function PersonaDashboard() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={(e) => toggleFavorite(persona.id, e)}
+                          onClick={(e) => toggleFavorite(persona.persona_id, e)}
                           className={`h-8 w-8 ${persona.isFavorite ? "text-amber-400" : "text-gray-400"}`}
                         >
                           <Star className={`h-4 w-4 ${persona.isFavorite ? "fill-current" : ""}`} />
@@ -793,9 +818,9 @@ export default function PersonaDashboard() {
                 <div className="space-y-6">
                   {sortedPersonas.map((persona) => (
                     <div
-                      key={persona.id}
+                      key={persona.persona_id}
                       className="flex items-start border-b pb-4 last:border-0 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      onClick={() => navigateToProfile(persona.id)}
+                      onClick={() => navigateToProfile(persona.persona_id)}
                     >
                       <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full mr-4"></div>
                       <div className="flex-1">
@@ -812,7 +837,7 @@ export default function PersonaDashboard() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={(e) => toggleFavorite(persona.id, e)}
+                              onClick={(e) => toggleFavorite(persona.persona_id, e)}
                               className={persona.isFavorite ? "text-amber-400" : "text-gray-400"}
                             >
                               <Star className={`h-5 w-5 ${persona.isFavorite ? "fill-current" : ""}`} />
@@ -912,7 +937,7 @@ export default function PersonaDashboard() {
       <ShareDashboardDialog isOpen={isShareDashboardOpen} onClose={() => setIsShareDashboardOpen(false)} />
 
       {/* Import Data Dialog */}
-      <ImportDataDialog isOpen={isImportDataOpen} onClose={() => setIsImportDataOpen(false)} />
+      <ImportDataDialog isOpen={isImportDataOpen} onClose={() => setIsImportDataOpen(false)} onImport={(personas) => setPersonas(personas)} />
 
       {/* Export Data Dialog */}
       <ExportDataDialog isOpen={isExportDataOpen} onClose={() => setIsExportDataOpen(false)} />
@@ -929,6 +954,7 @@ export default function PersonaDashboard() {
       {/* Restore Data Dialog */}
       <RestoreDataDialog isOpen={isRestoreDataOpen} onClose={() => setIsRestoreDataOpen(false)} />
     </div>
+  </div>
   )
 }
 
