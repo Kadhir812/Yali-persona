@@ -10,16 +10,14 @@ const dbConfig = {
   password: process.env.DB_PASSWORD,
 };
 const db = pgp(dbConfig);
-
-// ✅ Helper function to handle undefined values
+// ✅ Helper function to handle empty values
 const cleanValue = (value) => (value !== undefined && value !== "" ? value : null);
-
-const allowedCommuteModes = ["Public Transport", "Private Vehicle", "Taxi/Ride-sharing", "Walking", "Wheelchair"];
 
 const createPersona = async (persona) => {
   try {
     console.log("🔍 Checking if email already exists:", persona.email);
 
+    // ✅ Check if email already exists
     const existingPersona = await db.oneOrNone("SELECT * FROM personas WHERE email = $1", [persona.email]);
     if (existingPersona) {
       throw new Error(`Persona with email ${persona.email} already exists.`);
@@ -27,6 +25,7 @@ const createPersona = async (persona) => {
 
     console.log("✅ Email is unique, proceeding with insertion.");
 
+    // ✅ Insert into the `personas` table (only basic details)
     const personaResult = await db.one(
       `INSERT INTO personas (name, email, phone, state, pin_code, message, type, is_favorite, created_at, updated_at) 
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW()) RETURNING *`,
@@ -44,43 +43,88 @@ const createPersona = async (persona) => {
 
     console.log(`✅ Persona inserted with ID: ${personaResult.id}`);
 
+    // ✅ Insert into the corresponding table **only if additional details exist**
     switch (persona.type) {
-      case "Customers": {
-        // ✅ Validate commute_mode before inserting
-        if (!allowedCommuteModes.includes(persona.commuteMode)) {
-          throw new Error(
-            `Invalid commute_mode: "${persona.commuteMode}". Allowed values: ${allowedCommuteModes.join(", ")}`
-          );
+      case "Employees": {
+        if (persona.dateOfBirth || persona.fatherName || persona.bloodGroup) {
+          const employeeQuery = `
+            INSERT INTO employees (persona_id, date_of_birth, father_name, blood_group, emergency_contact, aadhar_number, 
+              joining_date, probation_end_date, previous_employer) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`;
+
+          const employeeValues = [
+            personaResult.id,
+            cleanValue(persona.dateOfBirth),
+            cleanValue(persona.fatherName),
+            cleanValue(persona.bloodGroup),
+            cleanValue(persona.emergencyContact),
+            cleanValue(persona.aadharNumber),
+            cleanValue(persona.joiningDate),
+            cleanValue(persona.probationEndDate),
+            cleanValue(persona.previousEmployer),
+          ];
+
+          console.log("🔄 Executing employee query:", employeeQuery, "with values:", employeeValues);
+          await db.one(employeeQuery, employeeValues);
+          console.log("✅ Employee inserted.");
         }
+        break;
+      }
 
-        const customerQuery = `
-          INSERT INTO customers (persona_id, age, location, job, income_range, family_members, weight, user_type, 
-            wheelchair_type, commute_range, commute_mode, pains_daily, pains_commute, solutions_needed, 
-            customer_segment, expected_gain) 
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`;
+      case "Vendors": {
+        if (persona.address || persona.panNumber || persona.gstNumber) {
+          const vendorQuery = `
+            INSERT INTO vendors (persona_id, address, pan_number, gst_number, bank_name, account_number, ifsc_code) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`;
 
-        const customerValues = [
-          personaResult.id,
-          cleanValue(persona.age),
-          cleanValue(persona.location),
-          cleanValue(persona.job),
-          cleanValue(persona.income),
-          cleanValue(persona.familyMembers),
-          cleanValue(persona.weight),
-          cleanValue(persona.userType),
-          cleanValue(persona.wheelchairType),
-          cleanValue(persona.commuteRange),
-          cleanValue(persona.commuteMode), // ✅ Only allowed values are inserted
-          cleanValue(persona.painsDaily),
-          cleanValue(persona.painsCommute),
-          cleanValue(persona.solutionsNeeded),
-          cleanValue(persona.customerSegment),
-          cleanValue(persona.expectedGain),
-        ];
+          const vendorValues = [
+            personaResult.id,
+            cleanValue(persona.address),
+            cleanValue(persona.panNumber),
+            cleanValue(persona.gstNumber),
+            cleanValue(persona.bankName),
+            cleanValue(persona.accountNumber),
+            cleanValue(persona.ifscCode),
+          ];
 
-        console.log("🔄 Executing customer query:", customerQuery, "with values:", customerValues);
-        await db.one(customerQuery, customerValues);
-        console.log("✅ Customer inserted.");
+          console.log("🔄 Executing vendor query:", vendorQuery, "with values:", vendorValues);
+          await db.one(vendorQuery, vendorValues);
+          console.log("✅ Vendor inserted.");
+        }
+        break;
+      }
+
+      case "Customers": {
+        if (persona.age || persona.location || persona.commuteMode) {
+          const customerQuery = `
+            INSERT INTO customers (persona_id, age, location, job, income_range, family_members, weight, user_type, 
+              wheelchair_type, commute_range, commute_mode, pains_daily, pains_commute, solutions_needed, 
+              customer_segment, expected_gain) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`;
+
+          const customerValues = [
+            personaResult.id,
+            cleanValue(persona.age),
+            cleanValue(persona.location),
+            cleanValue(persona.job),
+            cleanValue(persona.income),
+            cleanValue(persona.familyMembers),
+            cleanValue(persona.weight),
+            cleanValue(persona.userType),
+            cleanValue(persona.wheelchairType),
+            cleanValue(persona.commuteRange),
+            cleanValue(persona.commuteMode), // ✅ NULL if empty
+            cleanValue(persona.painsDaily),
+            cleanValue(persona.painsCommute),
+            cleanValue(persona.solutionsNeeded),
+            cleanValue(persona.customerSegment),
+            cleanValue(persona.expectedGain),
+          ];
+
+          console.log("🔄 Executing customer query:", customerQuery, "with values:", customerValues);
+          await db.one(customerQuery, customerValues);
+          console.log("✅ Customer inserted.");
+        }
         break;
       }
     }
