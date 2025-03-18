@@ -2,14 +2,20 @@ const express = require("express");
 const router = express.Router();
 const { createPersona, getPersonasByType, toggleFavorite } = require("../models/persona");
 
-// Add a new persona
 router.post("/personas", async (req, res) => {
   try {
     const personaData = req.body;
     const result = await createPersona(personaData);
+
+    if (!result) {
+      return res.status(500).json({ message: "Failed to create persona." });
+    }
+
+    console.log("✅ Persona successfully created:", result);
+
     res.status(201).json({ message: "Persona added successfully", data: result });
   } catch (error) {
-    console.error("Error adding persona:", error);
+    console.error("❌ Error adding persona:", error);
     res.status(500).json({ message: "Error adding persona", error: error.message });
   }
 });
